@@ -103,10 +103,19 @@ class CarbonPrintHandler(SimpleHTTPRequestHandler):
             if 'transport' in user_data:
                 transport_data = user_data['transport']
                 try:
+                    # Nouvelle logique avec voitures multiples
+                    voitures = transport_data.get('voitures', [])
+                    if not voitures and transport_data.get('voiture_personnelle', False):
+                        # Rétrocompatibilité : convertir ancienne structure
+                        voitures = [{
+                            'type_voiture': 'citadine',
+                            'type_carburant': transport_data.get('type_carburant', 'essence'),
+                            'age_voiture': 5,
+                            'km_voiture_an': float(transport_data.get('km_voiture_an', 0))
+                        }]
+                    
                     transport = Transport(
-                        voiture_personnelle=transport_data.get('voiture_personnelle', False),
-                        type_carburant=transport_data.get('type_carburant', 'essence'),
-                        km_voiture_an=float(transport_data.get('km_voiture_an', 0)),
+                        voitures=voitures,
                         covoiturage_frequence=transport_data.get('covoiturage_frequence', 'jamais'),
                         transport_commun=transport_data.get('transport_commun', False),
                         km_bus_an=float(transport_data.get('km_bus_an', 0)),
@@ -114,8 +123,7 @@ class CarbonPrintHandler(SimpleHTTPRequestHandler):
                         km_metro_an=float(transport_data.get('km_metro_an', 0)),
                         velo_usage=transport_data.get('velo_usage', 'jamais'),
                         marche_usage=transport_data.get('marche_usage', 'jamais'),
-                        avion_vols_domestiques=int(transport_data.get('avion_vols_domestiques', 0)),
-                        avion_vols_internationaux=int(transport_data.get('avion_vols_internationaux', 0)),
+                        vols_par_destination=transport_data.get('vols_par_destination', {}),
                         moto_usage=transport_data.get('moto_usage', False),
                         km_moto_an=float(transport_data.get('km_moto_an', 0))
                     )
@@ -124,9 +132,7 @@ class CarbonPrintHandler(SimpleHTTPRequestHandler):
                     print(f"Erreur lors de la création du transport: {e}")
                     # Créer un transport par défaut
                     transport = Transport(
-                        voiture_personnelle=False,
-                        type_carburant='essence',
-                        km_voiture_an=0.0,
+                        voitures=[],
                         covoiturage_frequence='jamais',
                         transport_commun=False,
                         km_bus_an=0.0,
@@ -134,8 +140,7 @@ class CarbonPrintHandler(SimpleHTTPRequestHandler):
                         km_metro_an=0.0,
                         velo_usage='jamais',
                         marche_usage='jamais',
-                        avion_vols_domestiques=0,
-                        avion_vols_internationaux=0,
+                        vols_par_destination={},
                         moto_usage=False,
                         km_moto_an=0.0
                     )
@@ -350,11 +355,34 @@ class CarbonPrintHandler(SimpleHTTPRequestHandler):
                     'error': 'Calcul invalide - veuillez vérifier vos réponses'
                 }
             
+            # Récupérer les détails des vols si disponibles
+            details_vols = {}
+            if hasattr(user, 'transport') and user.transport:
+                details_vols = user.transport.get_details_emissions_avion()
+            
+            # Inclure le détail des voitures dans la réponse
+            voitures = []
+            if hasattr(user, 'transport') and user.transport:
+                if hasattr(user.transport, 'voitures') and user.transport.voitures:
+                    voitures = user.transport.voitures
+            
+            # Inclure les données utilisateur brutes pour chaque catégorie
             return {
                 'success': True,
                 'empreinte_totale': round(empreinte_totale, 2),
                 'repartition': {k: round(v, 1) for k, v in repartition.items()},
-                'moyenne_francaise': 9.9
+                'moyenne_francaise': 9.9,
+                'details_vols': details_vols,
+                'voitures': voitures,
+                'logement': user_data.get('logement', {}),
+                'transport': user_data.get('transport', {}),
+                'alimentation': user_data.get('alimentation', {}),
+                'consommation': user_data.get('consommation', {}),
+                'sante': user_data.get('sante', {}),
+                'travail': user_data.get('travail', {}),
+                'dechets': user_data.get('dechets', {}),
+                'finance': user_data.get('finance', {}),
+                'services_publics': user_data.get('services_publics', {})
             }
             
         except Exception as e:
