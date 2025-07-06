@@ -105,34 +105,20 @@ const questions = [
         subtitle: 'Modes de transport utilisés au quotidien et pour les voyages',
         fields: [
             {
-                name: 'voiture_personnelle',
-                label: 'Possédez-vous une voiture personnelle ?',
-                type: 'radio',
-                options: [
-                    { value: true, label: 'Oui, je possède une voiture' },
-                    { value: false, label: 'Non, je n\'ai pas de voiture' }
-                ]
-            },
-            {
-                name: 'type_carburant',
-                label: 'Type de carburant de votre voiture',
-                type: 'select',
-                options: [
-                    { value: 'essence', label: 'Essence' },
-                    { value: 'diesel', label: 'Diesel' },
-                    { value: 'electrique', label: 'Électrique' },
-                    { value: 'hybride', label: 'Hybride rechargeable' },
-                    { value: 'gpl', label: 'GPL' }
-                ],
-                dependsOn: { field: 'voiture_personnelle', value: true }
-            },
-            {
-                name: 'km_voiture_an',
-                label: 'Kilométrage annuel en voiture (km)',
+                name: 'nb_voitures',
+                label: 'Combien de voitures possédez-vous ?',
                 type: 'number',
-                placeholder: 'Ex: 8000',
-                help: 'Distance totale parcourue en voiture par an',
-                dependsOn: { field: 'voiture_personnelle', value: true }
+                min: 0,
+                max: 5,
+                placeholder: 'Ex: 1',
+                help: 'Indiquez le nombre total de voitures dans votre foyer'
+            },
+            {
+                name: 'voitures_details',
+                label: 'Détail de chaque voiture',
+                type: 'voitures_dynamiques',
+                help: 'Pour chaque voiture, précisez le type, le carburant, l\'âge et le kilométrage annuel',
+                dependsOn: { field: 'nb_voitures', value: '>0' }
             },
             {
                 name: 'covoiturage_frequence',
@@ -199,18 +185,20 @@ const questions = [
                 ]
             },
             {
-                name: 'avion_vols_domestiques',
-                label: 'Nombre de vols domestiques par an',
+                name: 'nb_vols_an',
+                label: 'Nombre total de vols par an',
                 type: 'number',
-                placeholder: 'Ex: 2',
-                help: 'Vols en France métropolitaine'
+                placeholder: 'Ex: 3',
+                help: 'Indiquez le nombre total de vols que vous prenez par an',
+                min: 0,
+                max: 50
             },
             {
-                name: 'avion_vols_internationaux',
-                label: 'Nombre de vols internationaux par an',
-                type: 'number',
-                placeholder: 'Ex: 1',
-                help: 'Vols vers l\'étranger'
+                name: 'vols_details',
+                label: 'Détails des vols',
+                type: 'vols_dynamiques',
+                help: 'Sélectionnez la destination pour chaque vol',
+                dependsOn: { field: 'nb_vols_an', value: '>0' }
             },
             {
                 name: 'moto_usage',
@@ -837,14 +825,29 @@ function showQuestion(questionIndex) {
     questionFields.className = 'question-fields';
     
     question.fields.forEach(field => {
-        // Vérifier les dépendances
+        // Affichage spécial pour le champ dynamique des voitures
+        if (field.type === 'voitures_dynamiques') {
+            if (parseInt(userAnswers['nb_voitures']) > 0) {
+                const fieldGroup = createFieldGroup(field);
+                questionFields.appendChild(fieldGroup);
+            }
+            return;
+        }
+        // Affichage spécial pour le champ dynamique des vols
+        if (field.type === 'vols_dynamiques') {
+            if (parseInt(userAnswers['nb_vols_an']) > 0) {
+                const fieldGroup = createFieldGroup(field);
+                questionFields.appendChild(fieldGroup);
+            }
+            return;
+        }
+        // Vérifier les dépendances classiques
         if (field.dependsOn) {
             const dependentValue = userAnswers[field.dependsOn.field];
             if (dependentValue !== field.dependsOn.value) {
                 return; // Ne pas afficher ce champ
             }
         }
-        
         const fieldGroup = createFieldGroup(field);
         questionFields.appendChild(fieldGroup);
     });
@@ -886,6 +889,12 @@ function createFieldGroup(field) {
             break;
         case 'checkbox':
             fieldGroup.appendChild(createCheckboxGroup(field));
+            break;
+        case 'vols_dynamiques':
+            fieldGroup.appendChild(createVolsDynamiques(field));
+            break;
+        case 'voitures_dynamiques':
+            fieldGroup.appendChild(createVoituresDynamiques(field));
             break;
     }
     
@@ -932,6 +941,14 @@ function createNumberField(field) {
     input.addEventListener('input', function() {
         userAnswers[field.name] = parseFloat(this.value) || 0;
         saveAnswers();
+        
+        // Si c'est le champ nb_vols_an, mettre à jour les champs de vols
+        if (field.name === 'nb_vols_an') {
+            const volsContainer = document.getElementById('vols-dynamiques-container');
+            if (volsContainer) {
+                updateVolsFields();
+            }
+        }
     });
     
     return input;
@@ -1024,6 +1041,112 @@ function createCheckboxGroup(field) {
     return checkboxGroup;
 }
 
+// Destinations disponibles pour les vols
+const destinationsVols = [
+    { value: 'france_metropolitaine', label: 'France métropolitaine' },
+    { value: 'europe_ouest', label: 'Europe de l\'Ouest (Allemagne, Benelux, Suisse...)' },
+    { value: 'europe_est', label: 'Europe de l\'Est (Pologne, République tchèque, Hongrie...)' },
+    { value: 'europe_nord', label: 'Europe du Nord (Scandinavie, Pays baltes...)' },
+    { value: 'europe_sud', label: 'Europe du Sud (Espagne, Portugal, Italie, Grèce...)' },
+    { value: 'afrique_nord', label: 'Afrique du Nord (Maroc, Algérie, Tunisie...)' },
+    { value: 'afrique_ouest', label: 'Afrique de l\'Ouest (Sénégal, Côte d\'Ivoire...)' },
+    { value: 'afrique_est', label: 'Afrique de l\'Est (Kenya, Tanzanie, Éthiopie...)' },
+    { value: 'afrique_sud', label: 'Afrique du Sud (Afrique du Sud, Namibie...)' },
+    { value: 'amerique_nord', label: 'Amérique du Nord (États-Unis, Canada...)' },
+    { value: 'amerique_sud', label: 'Amérique du Sud (Brésil, Argentine, Chili...)' },
+    { value: 'amerique_centrale', label: 'Amérique centrale (Mexique, Costa Rica...)' },
+    { value: 'asie_ouest', label: 'Asie de l\'Ouest (Turquie, Israël, Émirats arabes unis...)' },
+    { value: 'asie_est', label: 'Asie de l\'Est (Japon, Corée du Sud, Chine...)' },
+    { value: 'asie_sud', label: 'Asie du Sud (Inde, Pakistan, Bangladesh...)' },
+    { value: 'asie_sud_est', label: 'Asie du Sud-Est (Thaïlande, Vietnam, Indonésie...)' },
+    { value: 'oceanie', label: 'Océanie (Australie, Nouvelle-Zélande...)' }
+];
+
+// Fonction globale pour mettre à jour les champs de vols
+function updateVolsFields() {
+    const container = document.getElementById('vols-dynamiques-container');
+    if (!container) return;
+    
+    const nbVols = parseInt(userAnswers['nb_vols_an']) || 0;
+    container.innerHTML = '';
+    
+    if (nbVols > 0) {
+        for (let i = 0; i < nbVols; i++) {
+            const volField = createVolField(i);
+            container.appendChild(volField);
+            
+            // Restaurer la valeur si elle existe
+            if (userAnswers['vols_details'] && userAnswers['vols_details'][i]) {
+                volField.querySelector('select').value = userAnswers['vols_details'][i];
+            }
+        }
+    }
+}
+
+// Fonction pour créer un champ de destination pour un vol
+function createVolField(volIndex) {
+    const volContainer = document.createElement('div');
+    volContainer.className = 'vol-field';
+    volContainer.id = `vol-${volIndex}`;
+    
+    const label = document.createElement('label');
+    label.textContent = `Vol ${volIndex + 1} :`;
+    label.className = 'vol-label';
+    
+    const select = document.createElement('select');
+    select.name = `vol_destination_${volIndex}`;
+    select.id = `vol_destination_${volIndex}`;
+    select.className = 'vol-select';
+    
+    // Option par défaut
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Sélectionnez la destination...';
+    select.appendChild(defaultOption);
+    
+    // Options des destinations
+    destinationsVols.forEach(dest => {
+        const option = document.createElement('option');
+        option.value = dest.value;
+        option.textContent = dest.label;
+        select.appendChild(option);
+    });
+    
+    select.addEventListener('change', function() {
+        if (!userAnswers['vols_details']) {
+            userAnswers['vols_details'] = [];
+        }
+        if (this.value) {
+            userAnswers['vols_details'][volIndex] = this.value;
+        } else {
+            userAnswers['vols_details'][volIndex] = null;
+        }
+        saveAnswers();
+    });
+    
+    volContainer.appendChild(label);
+    volContainer.appendChild(select);
+    
+    return volContainer;
+}
+
+// Fonction pour créer les champs dynamiques des vols
+function createVolsDynamiques(field) {
+    const container = document.createElement('div');
+    container.className = 'vols-dynamiques-container';
+    container.id = 'vols-dynamiques-container';
+    
+    // Initialiser le tableau des vols
+    if (!userAnswers[field.name]) {
+        userAnswers[field.name] = [];
+    }
+    
+    // Initialiser les champs
+    updateVolsFields();
+    
+    return container;
+}
+
 // Fonction pour restaurer les valeurs des champs
 function restoreFieldValues(questionIndex) {
     const question = questions[questionIndex];
@@ -1041,12 +1164,30 @@ function restoreFieldValues(questionIndex) {
                         const checkbox = document.querySelector(`input[name="${field.name}"][value="${value}"]`);
                         if (checkbox) checkbox.checked = true;
                     });
+                } else if (field.type === 'vols_dynamiques') {
+                    // Les champs dynamiques se restaurent automatiquement dans createVolsDynamiques
                 } else {
                     element.value = savedValue;
                 }
             }
         }
     });
+    
+    // Mettre à jour les champs dynamiques des vols si nécessaire
+    const volsContainer = document.getElementById('vols-dynamiques-container');
+    if (volsContainer) {
+        const nbVols = parseInt(userAnswers['nb_vols_an']) || 0;
+        if (nbVols > 0) {
+            // Forcer la mise à jour des champs
+            setTimeout(() => {
+                const event = new Event('input');
+                const nbVolsInput = document.getElementById('nb_vols_an');
+                if (nbVolsInput) {
+                    nbVolsInput.dispatchEvent(event);
+                }
+            }, 100);
+        }
+    }
 }
 
 // Fonction pour sauvegarder les réponses
@@ -1112,8 +1253,9 @@ function updateNavigationButtons() {
 
 // Fonction pour calculer les résultats
 function calculateResults() {
-    // Préparer les données pour l'envoi au serveur
     const userData = prepareUserDataForServer();
+    // DEBUG : Affiche le JSON envoyé au backend
+    console.log('Données envoyées au backend :', JSON.stringify(userData, null, 2));
     
     // Afficher un indicateur de chargement
     showLoadingIndicator();
@@ -1155,24 +1297,53 @@ function prepareUserDataForServer() {
         });
     });
     
+    // Traitement spécial pour les vols par destination
+    if (userData.transport && userData.transport.vols_details) {
+        const vols_par_destination = {};
+        
+        // Compter les vols par destination
+        userData.transport.vols_details.forEach(destination => {
+            if (destination && destination !== '') {
+                if (vols_par_destination[destination]) {
+                    vols_par_destination[destination]++;
+                } else {
+                    vols_par_destination[destination] = 1;
+                }
+            }
+        });
+        
+        // Remplacer les détails par le dictionnaire compté
+        userData.transport.vols_par_destination = vols_par_destination;
+        delete userData.transport.vols_details;
+    }
+    
+    // Adapter prepareUserDataForServer pour regrouper les voitures
+    if (userData.transport && userData.transport.voitures_details) {
+        userData.transport.voitures = userData.transport.voitures_details;
+        delete userData.transport.voitures_details;
+    }
+    
     return userData;
 }
 
+// Variable globale temporaire pour stocker les données du dernier calcul
+let lastResultsData = null;
+
 // Fonction pour afficher les résultats
 function showResults(data) {
+    lastResultsData = data; // Stocke les données globalement pour les détails
     const modal = document.getElementById('resultsModal');
     const modalContent = document.getElementById('modalContent');
     
+    // Plus d'affichage du tableau des vols ici !
     const resultsHTML = `
         <div class="results-header">
             <h2>Votre Empreinte Carbone</h2>
         </div>
-        
         <div class="total-empreinte text-center">
             <span class="big-number">${data.empreinte_totale}</span>
             <span class="unit">tonnes CO2eq/an</span>
         </div>
-        
         <div class="comparison">
             <p>Comparaison avec la moyenne française (${data.moyenne_francaise} tonnes CO2eq/an) :</p>
             <div class="comparison-bar">
@@ -1185,22 +1356,22 @@ function showResults(data) {
                 }
             </p>
         </div>
-        
         <div class="repartition">
             <h3>Répartition par catégorie</h3>
+            <p class="category-instructions">Cliquez sur une catégorie pour voir le détail de vos émissions</p>
             <div class="categories">
                 ${Object.entries(data.repartition).map(([category, percentage]) => `
-                    <div class="category">
+                    <div class="category clickable" onclick="showCategoryDetails('${category}', ${data.empreinte_totale}, ${percentage})">
                         <div class="category-name">${category}</div>
                         <div class="category-bar">
                             <div class="category-fill" style="width: ${percentage}%"></div>
                         </div>
                         <div class="category-percentage">${percentage.toFixed(1)}%</div>
+                        <div class="category-emission">${((data.empreinte_totale * percentage) / 100).toFixed(1)} t CO₂eq</div>
                     </div>
                 `).join('')}
             </div>
         </div>
-        
         <div class="actions">
             <button onclick="restartQuestionnaire()" class="btn btn-secondary">
                 <i class="fas fa-redo"></i>
@@ -1215,6 +1386,74 @@ function showResults(data) {
     
     modalContent.innerHTML = resultsHTML;
     modal.style.display = 'block';
+}
+
+// Fonction pour afficher les détails d'une catégorie
+function showCategoryDetails(category, empreinteTotale, percentage) {
+    const modal = document.getElementById('resultsModal');
+    const modalContent = document.getElementById('modalContent');
+    
+    const emissionCategory = (empreinteTotale * percentage) / 100;
+    const userData = lastResultsData; // Utilise la variable globale
+    
+    let detailsHTML = '';
+    
+    switch(category) {
+        case 'Transport':
+            detailsHTML = generateTransportDetails(userData, emissionCategory);
+            break;
+        case 'Logement':
+            detailsHTML = generateLogementDetails(userData, emissionCategory);
+            break;
+        case 'Alimentation':
+            detailsHTML = generateAlimentationDetails(userData, emissionCategory);
+            break;
+        case 'Consommation':
+            detailsHTML = generateConsommationDetails(userData, emissionCategory);
+            break;
+        case 'Santé':
+            detailsHTML = generateSanteDetails(userData, emissionCategory);
+            break;
+        case 'Travail':
+            detailsHTML = generateTravailDetails(userData, emissionCategory);
+            break;
+        case 'Déchets':
+            detailsHTML = generateDechetsDetails(userData, emissionCategory);
+            break;
+        case 'Finance':
+            detailsHTML = generateFinanceDetails(userData, emissionCategory);
+            break;
+        case 'Services Publics':
+            detailsHTML = generateServicesPublicsDetails(userData, emissionCategory);
+            break;
+        default:
+            detailsHTML = '<p>Aucun détail disponible pour cette catégorie.</p>';
+    }
+    
+    const categoryModalHTML = `
+        <div class="category-details-header">
+            <button onclick="showResults(lastResultsData)" class="btn-back">
+                <i class="fas fa-arrow-left"></i>
+                <span>Retour aux résultats</span>
+            </button>
+            <h2>Détails - ${category}</h2>
+            <div class="category-summary">
+                <span class="category-emission-total">${emissionCategory.toFixed(1)} tonnes CO₂eq/an</span>
+                <span class="category-percentage">(${percentage.toFixed(1)}% de votre empreinte totale)</span>
+            </div>
+        </div>
+        <div class="category-details-content">
+            ${detailsHTML}
+        </div>
+        <div class="category-details-actions">
+            <button onclick="showResults(lastResultsData)" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i>
+                <span>Retour</span>
+            </button>
+        </div>
+    `;
+    
+    modalContent.innerHTML = categoryModalHTML;
 }
 
 // Fonction pour afficher un indicateur de chargement
@@ -1309,4 +1548,399 @@ function showSources() {
 }
 
 // Charger les réponses sauvegardées au démarrage
-loadAnswers(); 
+loadAnswers();
+
+// Ajout de la fonction createVoituresDynamiques
+function createVoituresDynamiques(field) {
+    const container = document.createElement('div');
+    container.className = 'voitures-dynamiques-container';
+    container.id = 'voitures-dynamiques-container';
+    if (!userAnswers[field.name]) userAnswers[field.name] = [];
+    const nbVoitures = parseInt(userAnswers['nb_voitures']) || 0;
+    container.innerHTML = '';
+    for (let i = 0; i < nbVoitures; i++) {
+        const bloc = document.createElement('div');
+        bloc.className = 'voiture-bloc';
+        bloc.innerHTML = `<div class='voiture-titre'>Voiture ${i+1}</div>`;
+        // Type
+        const typeSelect = document.createElement('select');
+        typeSelect.className = 'voiture-type';
+        typeSelect.innerHTML = `<option value=''>Type de voiture...</option>
+            <option value='citadine'>Citadine</option>
+            <option value='berline'>Berline</option>
+            <option value='suv'>SUV</option>
+            <option value='utilitaire'>Utilitaire</option>`;
+        typeSelect.value = userAnswers[field.name][i]?.type_voiture || '';
+        typeSelect.onchange = e => {
+            if (!userAnswers[field.name][i]) userAnswers[field.name][i] = {};
+            userAnswers[field.name][i].type_voiture = e.target.value;
+            saveAnswers();
+        };
+        bloc.appendChild(typeSelect);
+        // Carburant
+        const carbSelect = document.createElement('select');
+        carbSelect.className = 'voiture-carburant';
+        carbSelect.innerHTML = `<option value=''>Type de carburant...</option>
+            <option value='essence'>Essence</option>
+            <option value='diesel'>Diesel</option>
+            <option value='electrique'>Électrique</option>
+            <option value='hybride'>Hybride rechargeable</option>
+            <option value='gpl'>GPL</option>`;
+        carbSelect.value = userAnswers[field.name][i]?.type_carburant || '';
+        carbSelect.onchange = e => {
+            if (!userAnswers[field.name][i]) userAnswers[field.name][i] = {};
+            userAnswers[field.name][i].type_carburant = e.target.value;
+            saveAnswers();
+        };
+        bloc.appendChild(carbSelect);
+        // Âge
+        const ageInput = document.createElement('input');
+        ageInput.type = 'number';
+        ageInput.className = 'voiture-age';
+        ageInput.placeholder = 'Âge (années)';
+        ageInput.min = 0;
+        ageInput.max = 50;
+        ageInput.value = userAnswers[field.name][i]?.age_voiture || '';
+        ageInput.oninput = e => {
+            if (!userAnswers[field.name][i]) userAnswers[field.name][i] = {};
+            userAnswers[field.name][i].age_voiture = parseInt(e.target.value) || 0;
+            saveAnswers();
+        };
+        bloc.appendChild(ageInput);
+        // Km/an
+        const kmInput = document.createElement('input');
+        kmInput.type = 'number';
+        kmInput.className = 'voiture-km';
+        kmInput.placeholder = 'Km/an';
+        kmInput.min = 0;
+        kmInput.max = 100000;
+        kmInput.value = userAnswers[field.name][i]?.km_voiture_an || '';
+        kmInput.oninput = e => {
+            if (!userAnswers[field.name][i]) userAnswers[field.name][i] = {};
+            userAnswers[field.name][i].km_voiture_an = parseInt(e.target.value) || 0;
+            saveAnswers();
+        };
+        bloc.appendChild(kmInput);
+        container.appendChild(bloc);
+    }
+    return container;
+}
+
+// Après la fonction showQuestion
+// Ajout d'un écouteur dynamique pour nb_voitures
+(function() {
+    const form = document.getElementById('questionnaireForm');
+    if (!form) return;
+    form.addEventListener('input', function(e) {
+        if (e.target && e.target.name === 'nb_voitures') {
+            // Retrouver l'index de la question courante
+            const questionIndex = questions.findIndex(q => q.id === 'transport');
+            if (questionIndex !== -1) {
+                showQuestion(questionIndex);
+            }
+        }
+    });
+})();
+
+// Fonction pour générer les détails du transport
+function generateTransportDetails(userData, emissionCategory) {
+    let detailsHTML = '<div class="transport-details">';
+    // Détails des voitures
+    const voitures = userData.voitures || [];
+    if (voitures.length > 0) {
+        const facteurs_voiture = {
+            'essence': 0.2,
+            'diesel': 0.18,
+            'electrique': 0.02,
+            'hybride': 0.12,
+            'gpl': 0.15
+        };
+        const facteurs_covoiturage = {
+            'jamais': 1.0,
+            'occasionnel': 0.9,
+            'regulier': 0.7,
+            'quotidien': 0.5
+        };
+        const covoiturage = userData.covoiturage_frequence || 'jamais';
+        detailsHTML += `
+            <div class="detail-section">
+                <h3><i class="fas fa-car"></i> Détail de vos voitures</h3>
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Type</th>
+                            <th>Carburant</th>
+                            <th>Âge</th>
+                            <th>Km/an</th>
+                            <th>Émissions (t CO₂eq/an)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        let totalVoituresEmission = 0;
+        voitures.forEach((v, i) => {
+            const facteur = facteurs_voiture[v.type_carburant] || 0.2;
+            const cov = facteurs_covoiturage[covoiturage] || 1.0;
+            const km = v.km_voiture_an || 0;
+            const emission = (km * facteur * cov) / 1000;
+            totalVoituresEmission += emission;
+            detailsHTML += `
+                <tr>
+                    <td>${i+1}</td>
+                    <td>${v.type_voiture || 'Non spécifié'}</td>
+                    <td>${v.type_carburant || 'Non spécifié'}</td>
+                    <td>${v.age_voiture || 'Non spécifié'} ans</td>
+                    <td>${km.toLocaleString()} km</td>
+                    <td>${emission.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+        detailsHTML += `
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="5"><strong>Total voitures</strong></td>
+                            <td><strong>${totalVoituresEmission.toFixed(2)}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+    }
+    // Détails des vols
+    const detailsVols = userData.details_vols || {};
+    if (Object.keys(detailsVols).length > 0) {
+        detailsHTML += `
+            <div class="detail-section">
+                <h3><i class="fas fa-plane"></i> Détail de vos vols</h3>
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th>Destination</th>
+                            <th>Nombre de vols</th>
+                            <th>Distance (km)</th>
+                            <th>Émissions (t CO₂eq)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        let totalVolsEmission = 0;
+        Object.entries(detailsVols).forEach(([destination, details]) => {
+            totalVolsEmission += details.emission_tonnes;
+            detailsHTML += `
+                <tr>
+                    <td>${destination}</td>
+                    <td>${details.nb_vols}</td>
+                    <td>${details.distance_km}</td>
+                    <td>${details.emission_tonnes.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+        detailsHTML += `
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="3"><strong>Total vols</strong></td>
+                            <td><strong>${totalVolsEmission.toFixed(2)}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+    }
+    detailsHTML += '</div>';
+    return detailsHTML;
+}
+
+// Les autres fonctions de détail doivent utiliser userData (backend) et non userAnswers
+function generateLogementDetails(userData, emissionCategory) {
+    const logementData = userData.logement || {};
+    let detailsHTML = `
+        <div class="logement-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-home"></i> Caractéristiques de votre logement</h3>
+                <table class="detail-table">
+                    <tbody>
+                        <tr>
+                            <td><strong>Type de logement</strong></td>
+                            <td>${logementData.type_logement || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Surface</strong></td>
+                            <td>${logementData.surface || 'Non spécifié'} m²</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Nombre de personnes</strong></td>
+                            <td>${logementData.nb_personnes || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Énergie de chauffage</strong></td>
+                            <td>${logementData.energie_chauffage || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Qualité d'isolation</strong></td>
+                            <td>${logementData.isolation_qualite || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Climatisation</strong></td>
+                            <td>${logementData.climatisation ? 'Oui' : 'Non'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Classe énergétique électroménager</strong></td>
+                            <td>${logementData.electromenager_efficacite || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Année de construction</strong></td>
+                            <td>${logementData.annee_construction || 'Non spécifié'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="detail-section">
+                <h3><i class="fas fa-chart-pie"></i> Répartition des émissions</h3>
+                <p>Vos émissions de logement représentent <strong>${emissionCategory.toFixed(1)} tonnes CO₂eq/an</strong>.</p>
+                <p>Cette catégorie inclut :</p>
+                <ul>
+                    <li>Chauffage et climatisation</li>
+                    <li>Électricité et éclairage</li>
+                    <li>Électroménager</li>
+                    <li>Construction et entretien</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    return detailsHTML;
+}
+function generateAlimentationDetails(userData, emissionCategory) {
+    const alimentationData = userData.alimentation || {};
+    let detailsHTML = `
+        <div class="alimentation-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-utensils"></i> Vos habitudes alimentaires</h3>
+                <table class="detail-table">
+                    <tbody>
+                        <tr>
+                            <td><strong>Régime alimentaire</strong></td>
+                            <td>${alimentationData.regime_alimentaire || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fréquence viande rouge</strong></td>
+                            <td>${alimentationData.frequence_viande_rouge || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fréquence viande blanche</strong></td>
+                            <td>${alimentationData.frequence_viande_blanche || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fréquence poisson</strong></td>
+                            <td>${alimentationData.frequence_poisson || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fréquence produits laitiers</strong></td>
+                            <td>${alimentationData.frequence_produits_laitiers || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Origine des produits</strong></td>
+                            <td>${alimentationData.origine_produits || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Bio vs conventionnel</strong></td>
+                            <td>${alimentationData.bio_conventionnel || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Gaspillage alimentaire</strong></td>
+                            <td>${alimentationData.gaspillage_alimentaire || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fréquence restaurants</strong></td>
+                            <td>${alimentationData.restaurants_frequence || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fréquence plats préparés</strong></td>
+                            <td>${alimentationData.plats_prepares_frequence || 'Non spécifié'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="detail-section">
+                <h3><i class="fas fa-chart-pie"></i> Impact de vos choix</h3>
+                <p>Vos émissions alimentaires représentent <strong>${emissionCategory.toFixed(1)} tonnes CO₂eq/an</strong>.</p>
+                <p>Cette catégorie inclut :</p>
+                <ul>
+                    <li>Production agricole</li>
+                    <li>Transport des aliments</li>
+                    <li>Transformation et emballage</li>
+                    <li>Gaspillage alimentaire</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    return detailsHTML;
+}
+function generateConsommationDetails(userData, emissionCategory) {
+    return `
+        <div class="consommation-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-shopping-bag"></i> Vos habitudes de consommation</h3>
+                <p>Émissions totales : <strong>${emissionCategory.toFixed(1)} tonnes CO₂eq/an</strong></p>
+                <p>Cette catégorie inclut : vêtements, électronique, meubles, loisirs, etc.</p>
+            </div>
+        </div>
+    `;
+}
+function generateSanteDetails(userData, emissionCategory) {
+    return `
+        <div class="sante-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-heartbeat"></i> Santé et bien-être</h3>
+                <p>Émissions totales : <strong>${emissionCategory.toFixed(1)} tonnes CO₂eq/an</strong></p>
+                <p>Cette catégorie inclut : médicaments, soins médicaux, produits d'hygiène, etc.</p>
+            </div>
+        </div>
+    `;
+}
+function generateTravailDetails(userData, emissionCategory) {
+    return `
+        <div class="travail-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-briefcase"></i> Activité professionnelle</h3>
+                <p>Émissions totales : <strong>${emissionCategory.toFixed(1)} tonnes CO₂eq/an</strong></p>
+                <p>Cette catégorie inclut : déplacements professionnels, équipements de bureau, etc.</p>
+            </div>
+        </div>
+    `;
+}
+function generateDechetsDetails(userData, emissionCategory) {
+    return `
+        <div class="dechets-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-recycle"></i> Gestion des déchets</h3>
+                <p>Émissions totales : <strong>${emissionCategory.toFixed(1)} tonnes CO₂eq/an</strong></p>
+                <p>Cette catégorie inclut : traitement des déchets, recyclage, compostage, etc.</p>
+            </div>
+        </div>
+    `;
+}
+function generateFinanceDetails(userData, emissionCategory) {
+    return `
+        <div class="finance-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-piggy-bank"></i> Services financiers</h3>
+                <p>Émissions totales : <strong>${emissionCategory.toFixed(1)} tonnes CO₂eq/an</strong></p>
+                <p>Cette catégorie inclut : épargne, investissements, services bancaires, etc.</p>
+            </div>
+        </div>
+    `;
+}
+function generateServicesPublicsDetails(userData, emissionCategory) {
+    return `
+        <div class="services-publics-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-building"></i> Services publics</h3>
+                <p>Émissions totales : <strong>${emissionCategory.toFixed(1)} tonnes CO₂eq/an</strong></p>
+                <p>Cette catégorie inclut : éducation, santé, administration, défense, infrastructures, etc.</p>
+            </div>
+        </div>
+    `;
+} 

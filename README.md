@@ -24,7 +24,13 @@ Une application web complète pour calculer votre empreinte carbone annuelle bas
 - Voiture personnelle (type de carburant, kilométrage)
 - Transports en commun (bus, train, métro)
 - Modes doux (vélo, marche)
-- Avion (vols domestiques et internationaux)
+- **Avion détaillé par destination depuis Paris :**
+  - France métropolitaine
+  - Europe (Ouest, Est, Nord, Sud)
+  - Afrique (Nord, Ouest, Est, Sud)
+  - Amérique (Nord, Sud, Centrale)
+  - Asie (Ouest, Est, Sud, Sud-Est)
+  - Océanie
 - Covoiturage et moto
 
 ### 3. 🍽️ **Alimentation**
@@ -160,6 +166,13 @@ Les calculs sont basés sur des sources scientifiques reconnues :
 - Animations fluides et transitions
 - Design responsive (mobile, tablette, desktop)
 - Palette de couleurs cohérente
+
+### Détail des émissions aériennes
+- **Interface dynamique intuitive** : L'utilisateur indique le nombre total de vols, puis sélectionne la destination pour chaque vol
+- **17 destinations disponibles** : Couvre tous les continents et régions principales depuis Paris
+- **Calcul précis par destination** : Les émissions sont calculées en fonction de la distance réelle depuis Paris
+- **Affichage détaillé** : Nombre de vols, distance, émissions par destination
+- **Facteurs d'émission réalistes** : Basés sur les données de l'ADEME et du GIEC
 
 ### Expérience utilisateur
 - Navigation intuitive avec boutons précédent/suivant
