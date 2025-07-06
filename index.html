@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur d'Empreinte Carbone - Découvrez votre impact environnemental</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-leaf"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>CarbonPrint</h1>
+                        <p>Calculateur d'Empreinte Carbone</p>
+                    </div>
+                </div>
+                <div class="header-description">
+                    <p>Découvrez votre impact environnemental en quelques minutes</p>
+                    <p class="subtitle">Calcul basé sur les facteurs d'émission français et internationaux</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-info">
+                    <span id="progressText" class="progress-text">Étape 1 sur 9</span>
+                    <span id="progressPercentage" class="progress-percentage">11%</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- Questionnaire -->
+            <div class="questionnaire-container">
+                <form id="questionnaireForm" class="questionnaire-form">
+                    <!-- Le contenu sera généré par JavaScript -->
+                </form>
+
+                <!-- Navigation -->
+                <div class="navigation-buttons">
+                    <button id="prevBtn" onclick="previousQuestion()" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Précédent</span>
+                    </button>
+                    <button id="nextBtn" onclick="nextQuestion()" class="btn btn-primary">
+                        <span>Suivant</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <p><i class="fas fa-info-circle"></i> Ce calculateur utilise des données scientifiques pour estimer votre empreinte carbone</p>
+                </div>
+                <div class="footer-links">
+                    <a href="#" onclick="showInfo()">À propos</a>
+                    <a href="#" onclick="showSources()">Sources</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Results Modal -->
+    <div id="resultsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-pie"></i> Vos Résultats</h2>
+                <button onclick="closeModal()" class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="modalContent" class="modal-body">
+                <!-- Le contenu sera généré par JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-info-circle"></i> À propos</h2>
+                <button onclick="closeInfoModal()" class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Ce calculateur d'empreinte carbone a été conçu pour vous aider à comprendre votre impact environnemental.</p>
+                <p>Les calculs sont basés sur des facteurs d'émission scientifiques et des données françaises.</p>
+                <p>L'objectif est de vous sensibiliser et de vous donner des pistes pour réduire votre empreinte carbone.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
